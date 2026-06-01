@@ -1,0 +1,365 @@
+{
+  "name": "LocalProspects Lead Email Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "LocalProspects Lead Search",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "keyword",
+              "placeholder": "electrician",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "location_code",
+              "fieldType": "number",
+              "placeholder": "1012938",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.3,
+      "position": [
+        -640,
+        -80
+      ],
+      "id": "8d1511ad-526a-4c5a-b7e7-7b4f6fbf2b83",
+      "name": "On form submission"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://localprospects.ai/api/v1/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_LOCALPROSPECTS_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "keyword",
+              "value": "={{ $json.keyword }}"
+            },
+            {
+              "name": "location_code",
+              "value": "={{ Number($json.location_code) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -400,
+        -80
+      ],
+      "id": "b602bd3a-74b5-4a67-a84e-cd87d88b9806",
+      "name": "Start LocalProspects search"
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -160,
+        -80
+      ],
+      "id": "d7c77bb6-b176-45cc-80f4-18313e4b9880",
+      "name": "Wait 30 seconds"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://localprospects.ai/api/v1/job/' + $node['Start LocalProspects search'].json.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_LOCALPROSPECTS_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        80,
+        -80
+      ],
+      "id": "62fa4f25-4173-43c6-a91a-c8cae0f3f719",
+      "name": "Poll job status"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c1cc96f4-8431-4687-8c7e-a601f719daff",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        320,
+        -80
+      ],
+      "id": "d52722f4-145c-4511-b067-5c2dc88a7e98",
+      "name": "Job completed?"
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://localprospects.ai/api/v1/job/' + $node['Start LocalProspects search'].json.job_id + '/results' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "YOUR_LOCALPROSPECTS_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        560,
+        -180
+      ],
+      "id": "35e0a33a-18be-4ce2-8b2b-a462cf478d71",
+      "name": "Get enriched results"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        800,
+        -180
+      ],
+      "id": "3ca45520-8d01-4530-b062-a0e25bad1a52",
+      "name": "Split results"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "chat-latest",
+          "mode": "list",
+          "cachedResultName": "CHAT-LATEST"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You write concise, specific B2B cold email drafts."
+            },
+            {
+              "role": "user",
+              "content": "Write a short personalized outreach email for this local business lead. Mention one concrete detail if available and keep it under 120 words. Lead JSON: {{ JSON.stringify($json) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        -180
+      ],
+      "id": "fac8e95f-e0cf-48f7-aea1-4c69139457e9",
+      "name": "Write personalized email"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1280,
+        -180
+      ],
+      "id": "e9fb0065-759e-44fb-b8a0-9eddf6dd05eb",
+      "name": "Save lead placeholder"
+    },
+    {
+      "parameters": {
+        "content": "## Step 1: Start a LocalProspects.ai search",
+        "height": 120,
+        "width": 520
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -680,
+        -300
+      ],
+      "id": "50750e08-b6e9-4658-a701-bb488ae9b686",
+      "name": "Step 1 note"
+    },
+    {
+      "parameters": {
+        "content": "## Step 2: Poll until enrichment is complete",
+        "height": 120,
+        "width": 620
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        -300
+      ],
+      "id": "9c496b84-8e5f-46f4-8a17-915147572bd4",
+      "name": "Step 2 note"
+    },
+    {
+      "parameters": {
+        "content": "## Step 3: Split leads and draft personalized emails",
+        "height": 120,
+        "width": 760
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        540,
+        -400
+      ],
+      "id": "ec0a63eb-4c57-4d11-908e-d9ec754a4ebd",
+      "name": "Step 3 note"
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Start LocalProspects search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start LocalProspects search": {
+      "main": [
+        [
+          {
+            "node": "Wait 30 seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30 seconds": {
+      "main": [
+        [
+          {
+            "node": "Poll job status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll job status": {
+      "main": [
+        [
+          {
+            "node": "Job completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Job completed?": {
+      "main": [
+        [
+          {
+            "node": "Get enriched results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 30 seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get enriched results": {
+      "main": [
+        [
+          {
+            "node": "Split results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split results": {
+      "main": [
+        [
+          {
+            "node": "Write personalized email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write personalized email": {
+      "main": [
+        [
+          {
+            "node": "Save lead placeholder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {}
+}
